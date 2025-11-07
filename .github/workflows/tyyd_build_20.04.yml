@@ -22,14 +22,15 @@ jobs:
             build-essential \
             cmake \
             git \
+            curl ca-certificates \
             libjson-c-dev \
             libwebsockets-dev \
-            libev4 \
-            curl ca-certificates &&
+            libev4 &&
 
           # Clean previous source if exists
           rm -rf ttyd &&
 
+          # Clone and build ttyd
           git clone https://github.com/tsl0922/ttyd.git &&
           cd ttyd &&
           mkdir build && cd build &&
@@ -37,6 +38,7 @@ jobs:
           make -j\$(nproc) &&
           make install &&
 
+          # Copy built binary
           mkdir -p /build/output &&
           cp /opt/ttyd/bin/ttyd /build/output/ttyd
         "
@@ -53,8 +55,9 @@ jobs:
         body: |
           ✅ Built inside Ubuntu 20.04 container (glibc 2.31)  
           ✅ Compatible with QNAP NAS, Debian 10+, Ubuntu 20.04+, and modern systems  
-          ✅ Linked with libwebsockets, json-c, and libev  
-          ⚠️ Not compatible with glibc < 2.25
+          ✅ Dynamically linked with libwebsockets, json-c, and libev  
+          ⚠️ Requires runtime libraries: libjson-c.so.4 and libev.so.4  
+          ✅ No post-install apt steps needed — dependencies resolved during build
         files: ttyd-build.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GH_PAT }}
