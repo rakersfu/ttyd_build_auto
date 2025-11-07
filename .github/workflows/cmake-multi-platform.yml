@@ -66,13 +66,16 @@ jobs:
         make install &&
         cd /build &&
 
-        # 构建 libwebsockets 静态库
+        # 构建 libwebsockets 静态库（启用 libuv 和 OpenSSL，禁用 mbedtls）
         git clone https://github.com/warmcat/libwebsockets.git -b v4.3.2 &&
         cd libwebsockets &&
         mkdir build && cd build &&
         cmake .. -DCMAKE_INSTALL_PREFIX=/opt/libwebsockets \
                  -DLWS_WITH_STATIC=ON \
-                 -DLWS_WITH_SHARED=OFF &&
+                 -DLWS_WITH_SHARED=OFF \
+                 -DLWS_WITH_LIBUV=ON \
+                 -DLWS_WITH_SSL=ON \
+                 -DLWS_WITH_MBEDTLS=OFF &&
         make -j\$(nproc) &&
         make install &&
         cd /build &&
