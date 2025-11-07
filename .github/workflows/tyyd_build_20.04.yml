@@ -1,0 +1,57 @@
+name: Build ttyd and Release Ubuntu_2004
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-ttyd:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Build ttyd inside Ubuntu 20.04 container (glibc 2.31)
+      run: |
+        docker run --rm -v $PWD:/build -w /build ubuntu:20.04 bash -c "
+          set -e
+          apt update &&
+          DEBIAN_FRONTEND=noninteractive apt install -y \
+            build-essential \
+            cmake \
+            git \
+            libjson-c-dev \
+            libwebsockets-dev \
+            libev4 \
+            curl ca-certificates &&
+          
+          git clone https://github.com/tsl0922/ttyd.git &&
+          cd ttyd &&
+          mkdir build && cd build &&
+          cmake .. -DCMAKE_INSTALL_PREFIX=/opt/ttyd &&
+          make -j\$(nproc) &&
+          make install &&
+          
+          mkdir -p /build/output &&
+          cp /opt/ttyd/bin/ttyd /build/output/ttyd
+        "
+
+    - name: Package build output
+      run: |
+        tar -czvf ttyd-build.tar.gz output
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ttyd-1.7.4-qnap
+        name: "ttyd 1.7.4 Build (Ubuntu 20.04)"
+        body: |
+          ✅ Built inside Ubuntu 20.04 container (glibc 2.31)  
+          ✅ Compatible with QNAP NAS, Debian 10+, Ubuntu 20.04+, and modern systems  
+          ✅ Linked with libwebsockets, json-c, and libev  
+          ⚠️ Not compatible with glibc < 2.25
+        files: ttyd-build.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PAT }}
