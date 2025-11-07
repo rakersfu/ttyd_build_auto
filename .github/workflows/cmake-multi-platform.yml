@@ -82,19 +82,19 @@ jobs:
         make install &&
         cd /src &&
 
-        # 注入静态链接配置
-        echo 'set(LWS_LINK_STATIC ON)' >> CMakeLists.txt &&
-        echo 'set(OPENSSL_USE_STATIC_LIBS TRUE)' >> CMakeLists.txt &&
-        echo 'set(OPENSSL_ROOT_DIR /opt/openssl)' >> CMakeLists.txt &&
-        echo 'set(OPENSSL_INCLUDE_DIR /opt/openssl/include)' >> CMakeLists.txt &&
-        echo 'set(OPENSSL_CRYPTO_LIBRARY /opt/openssl/lib/libcrypto.a)' >> CMakeLists.txt &&
-        echo 'set(OPENSSL_SSL_LIBRARY /opt/openssl/lib/libssl.a)' >> CMakeLists.txt &&
-        cat /patch.cmake >> CMakeLists.txt &&
+        # 注入静态链接配置到 /src/CMakeLists.txt
+        echo 'set(LWS_LINK_STATIC ON)' >> /src/CMakeLists.txt &&
+        echo 'set(OPENSSL_USE_STATIC_LIBS TRUE)' >> /src/CMakeLists.txt &&
+        echo 'set(OPENSSL_ROOT_DIR /opt/openssl)' >> /src/CMakeLists.txt &&
+        echo 'set(OPENSSL_INCLUDE_DIR /opt/openssl/include)' >> /src/CMakeLists.txt &&
+        echo 'set(OPENSSL_CRYPTO_LIBRARY /opt/openssl/lib/libcrypto.a)' >> /src/CMakeLists.txt &&
+        echo 'set(OPENSSL_SSL_LIBRARY /opt/openssl/lib/libssl.a)' >> /src/CMakeLists.txt &&
+        cat /patch.cmake >> /src/CMakeLists.txt &&
 
         # 构建 ttyd
-        mkdir build && cd build &&
+        mkdir /src/build && cd /src/build &&
         export CFLAGS=\"-I/opt/json-c/include/json-c\" &&
-        cmake .. -DCMAKE_INSTALL_PREFIX=/opt/ttyd \
+        cmake /src -DCMAKE_INSTALL_PREFIX=/opt/ttyd \
                  -DCMAKE_PREFIX_PATH=\"/opt/openssl;/opt/json-c;/opt/libuv;/opt/libwebsockets\" \
                  -DOPENSSL_USE_STATIC_LIBS=ON \
                  -DOPENSSL_ROOT_DIR=/opt/openssl \
