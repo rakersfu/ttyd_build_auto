@@ -40,8 +40,8 @@ jobs:
           export PATH=/opt/cmake/bin:\$PATH &&
           cmake --version &&
 
-          # Build zlib (static)
-          curl -LO https://zlib.net/zlib-1.2.13.tar.gz &&
+          # Build zlib (static) from GitHub mirror
+          curl -LO https://github.com/madler/zlib/releases/download/v1.2.13/zlib-1.2.13.tar.gz &&
           tar -xzf zlib-1.2.13.tar.gz &&
           cd zlib-1.2.13 &&
           ./configure --static --prefix=/opt/zlib &&
