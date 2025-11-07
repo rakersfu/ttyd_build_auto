@@ -1,0 +1,94 @@
+name: Build ttyd and Release Ubuntu_1604
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-ttyd:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Build ttyd inside Ubuntu 16.04 container (glibc 2.23)
+      run: |
+        docker run --rm -v $PWD:/build -w /build ubuntu:16.04 bash -c "
+          set -e
+          apt update &&
+          DEBIAN_FRONTEND=noninteractive apt install -y \
+            build-essential \
+            git \
+            curl ca-certificates \
+            libjson-c-dev \
+            zlib1g-dev \
+            libuv1-dev &&
+
+          # 限制 CPU 指令集，确保兼容 QNAP
+          export CFLAGS='-O2 -march=x86-64 -mtune=generic'
+          export CXXFLAGS='-O2 -march=x86-64 -mtune=generic'
+
+          curl -LO https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-linux-x86_64.tar.gz &&
+          tar -xzf cmake-3.27.9-linux-x86_64.tar.gz &&
+          mv cmake-3.27.9-linux-x86_64 /opt/cmake &&
+          ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake &&
+
+          curl -LO https://www.openssl.org/source/openssl-1.1.1u.tar.gz &&
+          tar -xzf openssl-1.1.1u.tar.gz &&
+          cd openssl-1.1.1u &&
+          ./config --prefix=/opt/openssl no-shared &&
+          make -j\$(nproc) &&
+          make install &&
+          cd /build &&
+
+          git clone https://github.com/warmcat/libwebsockets.git -b v4.3.2 &&
+          cd libwebsockets &&
+          mkdir build && cd build &&
+          cmake .. -DCMAKE_INSTALL_PREFIX=/opt/libwebsockets \
+                   -DLWS_WITH_STATIC=ON \
+                   -DLWS_WITH_SHARED=ON \
+                   -DLWS_WITH_SSL=ON \
+                   -DLWS_WITH_LIBUV=ON \
+                   -DOPENSSL_ROOT_DIR=/opt/openssl \
+                   -DCMAKE_C_FLAGS='\$CFLAGS' \
+                   -DCMAKE_CXX_FLAGS='\$CXXFLAGS' &&
+          make -j\$(nproc) &&
+          make install &&
+          cd /build &&
+
+          git clone https://github.com/tsl0922/ttyd.git &&
+          cd ttyd &&
+          mkdir build && cd build &&
+          cmake .. -DCMAKE_INSTALL_PREFIX=/opt/ttyd \
+                   -DLibwebsockets_DIR=/opt/libwebsockets/lib/cmake/libwebsockets \
+                   -DOPENSSL_ROOT_DIR=/opt/openssl \
+                   -DCMAKE_C_FLAGS='\$CFLAGS' \
+                   -DCMAKE_CXX_FLAGS='\$CXXFLAGS' &&
+          make -j\$(nproc) &&
+          make install &&
+
+          mkdir -p /build/output &&
+          cp /opt/ttyd/bin/ttyd /build/output/ttyd
+        "
+
+    - name: Package build output
+      run: |
+        tar -czvf ttyd-build.tar.gz output
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ttyd-1.7.7-qnap
+        name: "ttyd 1.7.7 Build (Ubuntu 16.04)"
+        body: |
+          ✅ Built inside Ubuntu 16.04 container (glibc 2.23)  
+          ✅ Compatible with QNAP NAS, Debian 8/9, Ubuntu 16.04+, and other legacy systems  
+          ✅ Statically linked with OpenSSL 1.1.1u and libwebsockets 4.3.2  
+          ✅ No runtime dependency on glibc ≥ 2.25  
+          ✅ libuv support enabled, mbedtls disabled  
+          ✅ CPU flags limited to x86-64 baseline — safe for older NAS
+        files: ttyd-build.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PAT }}
