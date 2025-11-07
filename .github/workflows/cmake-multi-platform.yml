@@ -77,9 +77,9 @@ jobs:
         make install &&
         cd /build &&
 
-        # 屏蔽 OpenSSL 查找并追加链接配置
-        sed -i '/target_link_libraries(ttyd PRIVATE /d' ttyd/CMakeLists.txt &&
-        sed -i '/find_package(OpenSSL/d' ttyd/lib/tls/CMakeLists.txt &&
+        # 构建 ttyd（源码已在 ttyd/）
+        sed -i '/target_link_libraries(ttyd PRIVATE /d' ttyd/CMakeLists.txt || true &&
+        sed -i '/find_package(OpenSSL/d' ttyd/lib/tls/CMakeLists.txt || true &&
         echo 'set(LWS_LINK_STATIC ON)' >> ttyd/CMakeLists.txt &&
         echo 'set(OPENSSL_USE_STATIC_LIBS TRUE)' >> ttyd/CMakeLists.txt &&
         echo 'set(OPENSSL_ROOT_DIR /opt/openssl)' >> ttyd/CMakeLists.txt &&
