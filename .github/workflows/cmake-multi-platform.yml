@@ -22,12 +22,11 @@ jobs:
             build-essential \
             git \
             curl ca-certificates \
-            libjson-c-dev \
             libuv1-dev \
             file &&
 
           # Remove previous installations
-          rm -rf /opt/ttyd /opt/libwebsockets /opt/openssl /opt/zlib
+          rm -rf /opt/ttyd /opt/libwebsockets /opt/openssl /opt/zlib /opt/json-c
 
           # Set compiler flags for compatibility
           export CFLAGS='-O2 -march=x86-64 -mtune=generic'
@@ -40,7 +39,7 @@ jobs:
           export PATH=/opt/cmake/bin:\$PATH &&
           cmake --version &&
 
-          # Build zlib (static) from GitHub mirror
+          # Build zlib (static)
           curl -LO https://github.com/madler/zlib/releases/download/v1.2.13/zlib-1.2.13.tar.gz &&
           tar -xzf zlib-1.2.13.tar.gz &&
           cd zlib-1.2.13 &&
@@ -58,8 +57,15 @@ jobs:
           make install &&
           cd /build &&
 
+          # Build json-c (static)
+          git clone https://github.com/json-c/json-c.git -b json-c-0.11 &&
+          cd json-c &&
+          ./configure --disable-shared --enable-static --prefix=/opt/json-c &&
+          make -j\$(nproc) &&
+          make install &&
+          cd /build &&
+
           # Build libwebsockets (static only)
-          rm -rf libwebsockets &&
           git clone https://github.com/warmcat/libwebsockets.git -b v4.3.2 &&
           cd libwebsockets &&
           mkdir build && cd build &&
@@ -75,7 +81,6 @@ jobs:
           cd /build &&
 
           # Build ttyd (fully static)
-          rm -rf ttyd &&
           git clone https://github.com/tsl0922/ttyd.git &&
           cd ttyd &&
           mkdir build && cd build &&
@@ -84,6 +89,8 @@ jobs:
                    -DOPENSSL_ROOT_DIR=/opt/openssl \
                    -DZLIB_LIBRARY=/opt/zlib/lib/libz.a \
                    -DZLIB_INCLUDE_DIR=/opt/zlib/include \
+                   -DJSONC_LIBRARY=/opt/json-c/lib/libjson-c.a \
+                   -DJSONC_INCLUDE_DIR=/opt/json-c/include/json-c \
                    -DBUILD_SHARED_LIBS=OFF \
                    -DCMAKE_EXE_LINKER_FLAGS='-static' &&
           make -j\$(nproc) &&
@@ -119,7 +126,7 @@ jobs:
         name: "ttyd 1.7.7 Static Build (Ubuntu 16.04)"
         body: |
           ✅ Built inside Ubuntu 16.04 container (glibc 2.23)
-          ✅ Fully statically linked with OpenSSL 1.1.1u, libwebsockets 4.3.2, and zlib 1.2.13
+          ✅ Fully statically linked with OpenSSL 1.1.1u, libwebsockets 4.3.2, zlib 1.2.13, and json-c 0.11
           ✅ Compatible with QNAP NAS, Debian 8/9, Ubuntu 16.04+, Alpine, BusyBox
           ✅ No runtime dependency on glibc ≥ 2.25
           ✅ libuv support enabled, mbedtls disabled
