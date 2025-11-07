@@ -18,6 +18,7 @@ jobs:
         docker run --rm \
           -v $PWD/ttyd:/src \
           -v $PWD/patch.cmake:/patch.cmake \
+          -v $PWD:/build \
           -w /src ubuntu:16.04 bash -c "
         set -e
         apt update &&
@@ -82,13 +83,13 @@ jobs:
         cd /src &&
 
         # 注入静态链接配置
-        echo 'set(LWS_LINK_STATIC ON)' >> CMakeLists.txt
-        echo 'set(OPENSSL_USE_STATIC_LIBS TRUE)' >> CMakeLists.txt
-        echo 'set(OPENSSL_ROOT_DIR /opt/openssl)' >> CMakeLists.txt
-        echo 'set(OPENSSL_INCLUDE_DIR /opt/openssl/include)' >> CMakeLists.txt
-        echo 'set(OPENSSL_CRYPTO_LIBRARY /opt/openssl/lib/libcrypto.a)' >> CMakeLists.txt
-        echo 'set(OPENSSL_SSL_LIBRARY /opt/openssl/lib/libssl.a)' >> CMakeLists.txt
-        cat /patch.cmake >> CMakeLists.txt
+        echo 'set(LWS_LINK_STATIC ON)' >> CMakeLists.txt &&
+        echo 'set(OPENSSL_USE_STATIC_LIBS TRUE)' >> CMakeLists.txt &&
+        echo 'set(OPENSSL_ROOT_DIR /opt/openssl)' >> CMakeLists.txt &&
+        echo 'set(OPENSSL_INCLUDE_DIR /opt/openssl/include)' >> CMakeLists.txt &&
+        echo 'set(OPENSSL_CRYPTO_LIBRARY /opt/openssl/lib/libcrypto.a)' >> CMakeLists.txt &&
+        echo 'set(OPENSSL_SSL_LIBRARY /opt/openssl/lib/libssl.a)' >> CMakeLists.txt &&
+        cat /patch.cmake >> CMakeLists.txt &&
 
         # 构建 ttyd
         mkdir build && cd build &&
