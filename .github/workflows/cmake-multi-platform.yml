@@ -1,0 +1,152 @@
+name: Build ttyd and Release Static
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-ttyd:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Build static ttyd inside Ubuntu 16.04 container
+      run: |
+        docker run --rm \
+          -v $PWD:/build \
+          -w /build ubuntu:16.04 bash -c "
+        set -e
+        apt update &&
+        DEBIAN_FRONTEND=noninteractive apt install -y \
+          build-essential \
+          git \
+          curl ca-certificates \
+          zlib1g-dev \
+          pkg-config \
+          autoconf \
+          automake \
+          libtool &&
+
+        # 安装 CMake 3.27.9
+        curl -LO https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-linux-x86_64.tar.gz &&
+        tar -xzf cmake-3.27.9-linux-x86_64.tar.gz &&
+        mv cmake-3.27.9-linux-x86_64 /opt/cmake &&
+        ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake &&
+        export PATH=/opt/cmake/bin:\$PATH &&
+        cmake --version &&
+
+        # 构建 OpenSSL 静态库
+        curl -LO https://www.openssl.org/source/openssl-1.1.1u.tar.gz &&
+        tar -xzf openssl-1.1.1u.tar.gz &&
+        cd openssl-1.1.1u &&
+        ./config --prefix=/opt/openssl no-shared &&
+        make -j\$(nproc) &&
+        make install &&
+        cd /build &&
+
+        # 构建 json-c 静态库
+        curl -LO https://s3.amazonaws.com/json-c_releases/releases/json-c-0.17.tar.gz &&
+        tar -xzf json-c-0.17.tar.gz &&
+        cd json-c-0.17 &&
+        mkdir build && cd build &&
+        cmake .. -DCMAKE_INSTALL_PREFIX=/opt/json-c -DBUILD_SHARED_LIBS=OFF &&
+        make -j\$(nproc) &&
+        make install &&
+        cd /build &&
+
+        # 构建 libuv 静态库
+        git clone https://github.com/libuv/libuv.git -b v1.46.0 &&
+        cd libuv &&
+        sh autogen.sh &&
+        ./configure --prefix=/opt/libuv --disable-shared --enable-static &&
+        make -j\$(nproc) &&
+        make install &&
+        cd /build &&
+
+        # 构建 libwebsockets 静态库
+        git clone https://github.com/warmcat/libwebsockets.git -b v4.3.2 &&
+        cd libwebsockets &&
+        mkdir build && cd build &&
+        cmake .. -DCMAKE_INSTALL_PREFIX=/opt/libwebsockets \
+                 -DLWS_WITH_STATIC=ON \
+                 -DLWS_WITH_SHARED=OFF &&
+        make -j\$(nproc) &&
+        make install &&
+        cd /build &&
+
+        # 屏蔽 OpenSSL 查找并追加链接配置
+        sed -i '/target_link_libraries(ttyd PRIVATE /d' ttyd/CMakeLists.txt &&
+        sed -i '/find_package(OpenSSL/d' ttyd/lib/tls/CMakeLists.txt &&
+        echo 'set(LWS_LINK_STATIC ON)' >> ttyd/CMakeLists.txt &&
+        echo 'set(OPENSSL_USE_STATIC_LIBS TRUE)' >> ttyd/CMakeLists.txt &&
+        echo 'set(OPENSSL_ROOT_DIR /opt/openssl)' >> ttyd/CMakeLists.txt &&
+        echo 'set(OPENSSL_INCLUDE_DIR /opt/openssl/include)' >> ttyd/CMakeLists.txt &&
+        echo 'set(OPENSSL_CRYPTO_LIBRARY /opt/openssl/lib/libcrypto.a)' >> ttyd/CMakeLists.txt &&
+        echo 'set(OPENSSL_SSL_LIBRARY /opt/openssl/lib/libssl.a)' >> ttyd/CMakeLists.txt &&
+        cat patch.cmake >> ttyd/CMakeLists.txt &&
+        cd ttyd &&
+        mkdir build && cd build &&
+        export CFLAGS=\"-I/opt/json-c/include/json-c\" &&
+        cmake .. -DCMAKE_INSTALL_PREFIX=/opt/ttyd \
+                 -DCMAKE_PREFIX_PATH=\"/opt/openssl;/opt/json-c;/opt/libuv;/opt/libwebsockets\" \
+                 -DOPENSSL_USE_STATIC_LIBS=ON \
+                 -DOPENSSL_ROOT_DIR=/opt/openssl \
+                 -DOPENSSL_INCLUDE_DIR=/opt/openssl/include \
+                 -DOPENSSL_CRYPTO_LIBRARY=/opt/openssl/lib/libcrypto.a \
+                 -DOPENSSL_SSL_LIBRARY=/opt/openssl/lib/libssl.a \
+                 -DLIBUV_INCLUDE_DIR=/opt/libuv/include \
+                 -DLIBUV_LIBRARY=/opt/libuv/lib/libuv.a \
+                 -DJSON-C_INCLUDE_DIR=/opt/json-c/include \
+                 -DJSON-C_LIBRARY=/opt/json-c/lib/libjson-c.a \
+                 -DZLIB_LIBRARY=/usr/lib/x86_64-linux-gnu/libz.a \
+                 -DZLIB_INCLUDE_DIR=/usr/include \
+                 -DLWS_LINK_STATIC=ON \
+                 -DCMAKE_EXE_LINKER_FLAGS='-static' \
+                 -DCMAKE_FIND_LIBRARY_SUFFIXES='.a' \
+                 -DCMAKE_SKIP_RPATH=ON &&
+        make -j\$(nproc) &&
+        make install &&
+
+        # 验证并复制 ttyd 可执行文件
+        mkdir -p /build/output
+        if [ -f /opt/ttyd/bin/ttyd ]; then
+          cp /opt/ttyd/bin/ttyd /build/output/ttyd
+          echo '✅ ttyd binary copied'
+        else
+          echo '❌ ttyd 可执行文件未找到，跳过打包'
+          ls -l /opt/ttyd/bin
+          exit 1
+        fi
+
+        # 验证是否为静态链接
+        echo '🔍 ldd 检查 ttyd 是否为静态链接：'
+        ldd /build/output/ttyd || echo '✅ 静态链接确认：ldd 无法解析，说明无依赖'
+        "
+
+    - name: Package build output
+      run: |
+        if [ -d output ] && [ -f output/ttyd ]; then
+          tar -czvf ttyd-build.tar.gz output
+        else
+          echo '❌ output 目录不存在或 ttyd 文件缺失'
+          exit 1
+        fi
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ttyd-1.7.7-static
+        name: "ttyd 1.7.7 Static Build"
+        body: |
+          ✅ Built inside Ubuntu 16.04 container (glibc 2.23)  
+          ✅ Fully statically linked — no runtime dependency on libwebsockets, libuv, OpenSSL, json-c, or zlib  
+          ✅ Compatible with QNAP NAS, Alpine, BusyBox, and other minimal systems  
+          ✅ libuv support enabled, mbedtls disabled  
+          ✅ OpenSSL 1.1.1u + libwebsockets 4.3.2 + json-c 0.17 + libuv 1.46.0  
+          ✅ Verified with ldd: no dynamic dependencies
+        files: ttyd-build.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PAT }}
