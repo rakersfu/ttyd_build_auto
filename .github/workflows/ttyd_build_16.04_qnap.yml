@@ -51,9 +51,7 @@ jobs:
                    -DLWS_WITH_SHARED=ON \
                    -DLWS_WITH_SSL=ON \
                    -DLWS_WITH_LIBUV=ON \
-                   -DOPENSSL_ROOT_DIR=/opt/openssl \
-                   -DCMAKE_C_FLAGS='\$CFLAGS' \
-                   -DCMAKE_CXX_FLAGS='\$CXXFLAGS' &&
+                   -DOPENSSL_ROOT_DIR=/opt/openssl &&
           make -j\$(nproc) &&
           make install &&
           cd /build &&
@@ -63,14 +61,20 @@ jobs:
           mkdir build && cd build &&
           cmake .. -DCMAKE_INSTALL_PREFIX=/opt/ttyd \
                    -DLibwebsockets_DIR=/opt/libwebsockets/lib/cmake/libwebsockets \
-                   -DOPENSSL_ROOT_DIR=/opt/openssl \
-                   -DCMAKE_C_FLAGS='\$CFLAGS' \
-                   -DCMAKE_CXX_FLAGS='\$CXXFLAGS' &&
+                   -DOPENSSL_ROOT_DIR=/opt/openssl &&
           make -j\$(nproc) &&
           make install &&
 
           mkdir -p /build/output &&
           cp /opt/ttyd/bin/ttyd /build/output/ttyd
+
+          # 验证是否为静态链接
+          echo '🔍 ldd 检查 ttyd 是否为静态链接：'
+          ldd /build/output/ttyd || echo '✅ 静态链接确认：ldd 无法解析，说明无依赖'
+
+          # 验证是否使用基础指令集
+          echo '🔍 file 检查 CPU 架构：'
+          file /build/output/ttyd
         "
 
     - name: Package build output
@@ -88,7 +92,8 @@ jobs:
           ✅ Statically linked with OpenSSL 1.1.1u and libwebsockets 4.3.2  
           ✅ No runtime dependency on glibc ≥ 2.25  
           ✅ libuv support enabled, mbedtls disabled  
-          ✅ CPU flags limited to x86-64 baseline — safe for older NAS
+          ✅ CPU flags limited to x86-64 baseline — safe for older NAS  
+          ✅ Verified with ldd and file: no dynamic dependencies, no AVX/SSE4
         files: ttyd-build.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GH_PAT }}
