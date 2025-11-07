@@ -31,6 +31,13 @@ jobs:
           export CFLAGS='-O2 -march=x86-64 -mtune=generic'
           export CXXFLAGS='-O2 -march=x86-64 -mtune=generic'
 
+          # 安装 CMake 并加入 PATH
+          curl -LO https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-linux-x86_64.tar.gz &&
+          tar -xzf cmake-3.27.9-linux-x86_64.tar.gz &&
+          mv cmake-3.27.9-linux-x86_64 /opt/cmake &&
+          export PATH=/opt/cmake/bin:\$PATH &&
+          cmake --version &&
+
           # 构建 OpenSSL
           curl -LO https://www.openssl.org/source/openssl-1.1.1u.tar.gz &&
           tar -xzf openssl-1.1.1u.tar.gz &&
