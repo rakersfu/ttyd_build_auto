@@ -16,8 +16,9 @@ jobs:
     - name: Build static ttyd inside Ubuntu 16.04 container
       run: |
         docker run --rm \
-          -v $PWD:/build \
-          -w /build ubuntu:16.04 bash -c "
+          -v $PWD/ttyd:/src \
+          -v $PWD/patch.cmake:/patch.cmake \
+          -w /src ubuntu:16.04 bash -c "
         set -e
         apt update &&
         DEBIAN_FRONTEND=noninteractive apt install -y \
@@ -45,7 +46,7 @@ jobs:
         ./config --prefix=/opt/openssl no-shared &&
         make -j\$(nproc) &&
         make install &&
-        cd /build &&
+        cd /src &&
 
         # 构建 json-c 静态库
         curl -LO https://s3.amazonaws.com/json-c_releases/releases/json-c-0.17.tar.gz &&
@@ -55,7 +56,7 @@ jobs:
         cmake .. -DCMAKE_INSTALL_PREFIX=/opt/json-c -DBUILD_SHARED_LIBS=OFF &&
         make -j\$(nproc) &&
         make install &&
-        cd /build &&
+        cd /src &&
 
         # 构建 libuv 静态库
         git clone https://github.com/libuv/libuv.git -b v1.46.0 &&
@@ -64,9 +65,9 @@ jobs:
         ./configure --prefix=/opt/libuv --disable-shared --enable-static &&
         make -j\$(nproc) &&
         make install &&
-        cd /build &&
+        cd /src &&
 
-        # 构建 libwebsockets 静态库（启用 libuv 和 OpenSSL，禁用 mbedtls）
+        # 构建 libwebsockets 静态库
         git clone https://github.com/warmcat/libwebsockets.git -b v4.3.2 &&
         cd libwebsockets &&
         mkdir build && cd build &&
@@ -78,17 +79,18 @@ jobs:
                  -DLWS_WITH_MBEDTLS=OFF &&
         make -j\$(nproc) &&
         make install &&
-        cd /build &&
+        cd /src &&
 
-        # 构建 ttyd（源码在 ttyd/）
-        echo 'set(LWS_LINK_STATIC ON)' >> ttyd/CMakeLists.txt &&
-        echo 'set(OPENSSL_USE_STATIC_LIBS TRUE)' >> ttyd/CMakeLists.txt &&
-        echo 'set(OPENSSL_ROOT_DIR /opt/openssl)' >> ttyd/CMakeLists.txt &&
-        echo 'set(OPENSSL_INCLUDE_DIR /opt/openssl/include)' >> ttyd/CMakeLists.txt &&
-        echo 'set(OPENSSL_CRYPTO_LIBRARY /opt/openssl/lib/libcrypto.a)' >> ttyd/CMakeLists.txt &&
-        echo 'set(OPENSSL_SSL_LIBRARY /opt/openssl/lib/libssl.a)' >> ttyd/CMakeLists.txt &&
-        cat patch.cmake >> ttyd/CMakeLists.txt &&
-        cd ttyd &&
+        # 注入静态链接配置
+        echo 'set(LWS_LINK_STATIC ON)' >> CMakeLists.txt
+        echo 'set(OPENSSL_USE_STATIC_LIBS TRUE)' >> CMakeLists.txt
+        echo 'set(OPENSSL_ROOT_DIR /opt/openssl)' >> CMakeLists.txt
+        echo 'set(OPENSSL_INCLUDE_DIR /opt/openssl/include)' >> CMakeLists.txt
+        echo 'set(OPENSSL_CRYPTO_LIBRARY /opt/openssl/lib/libcrypto.a)' >> CMakeLists.txt
+        echo 'set(OPENSSL_SSL_LIBRARY /opt/openssl/lib/libssl.a)' >> CMakeLists.txt
+        cat /patch.cmake >> CMakeLists.txt
+
+        # 构建 ttyd
         mkdir build && cd build &&
         export CFLAGS=\"-I/opt/json-c/include/json-c\" &&
         cmake .. -DCMAKE_INSTALL_PREFIX=/opt/ttyd \
