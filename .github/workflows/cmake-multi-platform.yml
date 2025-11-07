@@ -77,7 +77,7 @@ jobs:
         make install &&
         cd /build &&
 
-        # 构建 ttyd（源码已在 ttyd/）
+        # 构建 ttyd（源码在 ttyd/）
         sed -i '/target_link_libraries(ttyd PRIVATE /d' ttyd/CMakeLists.txt || true &&
         sed -i '/find_package(OpenSSL/d' ttyd/lib/tls/CMakeLists.txt || true &&
         echo 'set(LWS_LINK_STATIC ON)' >> ttyd/CMakeLists.txt &&
