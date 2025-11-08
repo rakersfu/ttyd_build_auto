@@ -1,8 +1,9 @@
-ttyd 一键安装与自启动部署说明
-📦 项目简介
+ttyd 一键安装与自启动部署说明 📦
+项目简介
+
 本项目提供一个一键安装脚本 install_ttyd.sh，用于在 Linux 系统（如 Ubuntu、Debian、CentOS 等）上部署 ttyd —— 一个将终端共享为 Web 应用的轻量级工具。
 
-脚本支持：
+脚本支持功能：
 
 ✅ 自动卸载旧版本
 
@@ -16,21 +17,23 @@ ttyd 一键安装与自启动部署说明
 
 🚀 启动并验证 ttyd 服务
 
-📁 文件结构
-代码
+文件结构
 .
-├── install_ttyd.sh         # 一键安装脚本
-└── jkyd.x86_64             # （可选）ttyd 离线安装包（命名固定）
+├── install_ttyd.sh        # 一键安装脚本
+└── jkyd.x86_64            # （可选）ttyd 离线安装包（命名固定）
+
 🧰 安装步骤
-上传文件到 VPS，例如 /opt/ttyd_test/
 
-赋予执行权限并运行脚本：
+上传文件到你的 VPS 目录，例如 /opt/ttyd_test/
 
-bash
+赋予脚本执行权限并运行：
+
 cd /opt/ttyd_test
 chmod +x install_ttyd.sh
 sudo ./install_ttyd.sh
+
 🔐 默认登录信息
+
 访问地址：http://<你的服务器IP>:7681
 
 用户名：raker
@@ -49,15 +52,22 @@ sudo ./install_ttyd.sh
 取消开机自启	systemctl disable ttyd
 查看运行日志	journalctl -u ttyd -n 50 --no-pager
 🔓 防火墙配置（如启用 UFW）
-bash
+
+如果启用了 UFW 防火墙，使用以下命令开放端口 7681：
+
 sudo ufw allow 7681/tcp
+
 🧹 卸载方法
-bash
+
+若需要卸载 ttyd，请执行以下步骤：
+
 sudo systemctl stop ttyd
 sudo systemctl disable ttyd
 sudo rm -f /etc/systemd/system/ttyd.service
 sudo rm -f /usr/local/bin/ttyd
 sudo rm -rf /opt/ttyd
 sudo systemctl daemon-reload
+
 📦 离线安装说明
-若当前目录存在 jkyd.x86_64 文件，脚本将自动跳过下载步骤，适用于无公网环境的部署。
+
+如果当前目录下存在 jkyd.x86_64 文件，脚本将自动跳过下载步骤，适用于无公网环境的部署。
